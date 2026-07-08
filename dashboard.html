@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MISSION CONTROL</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{
+  --bg:#04070f; --panel:#0a1220cc; --line:#1b3a5c; --line2:#12283f;
+  --cyan:#4fd8eb; --cyan-dim:#2a7f94; --amber:#ffb347; --green:#5dd97c;
+  --red:#ff4d5e; --text:#c8dbe8; --dim:#5f7d95; --mono:'Consolas','Cascadia Mono','Courier New',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:var(--mono);font-size:13px;cursor:default}
+body.night{filter:brightness(.55)}
+body.hidecursor{cursor:none}
+#stars{position:fixed;inset:0;z-index:0}
+#shell{position:relative;z-index:1;height:100%;display:flex;flex-direction:column;
+  padding:8px 10px 0;transition:transform 2s ease}
+/* ---------- header ---------- */
+#hdr{display:flex;align-items:center;gap:16px;padding:4px 8px 8px;flex:0 0 auto}
+#hdr .brand{font-size:15px;letter-spacing:3px;color:var(--cyan);text-shadow:0 0 8px #4fd8eb55}
+#hdr .brand small{display:block;font-size:9px;letter-spacing:2px;color:var(--dim)}
+#clockLocal{margin-left:auto;text-align:center}
+#clockLocal .t{font-size:30px;color:#eaf6ff;letter-spacing:2px;text-shadow:0 0 10px #4fd8eb44}
+#clockLocal .d{font-size:10px;letter-spacing:2px;color:var(--dim)}
+#clockUTC{margin-left:auto;text-align:right;font-size:11px;color:var(--dim)}
+#clockUTC .t{font-size:16px;color:var(--amber)}
+#statusLight{width:10px;height:10px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 8px var(--green);margin-left:14px}
+#statusLight.red{background:var(--red);box-shadow:0 0 10px var(--red);animation:blink 1s infinite}
+#fsBtn{margin-left:14px;background:none;border:1px solid var(--line);color:var(--dim);
+  font-family:var(--mono);font-size:14px;padding:3px 9px;cursor:pointer}
+#fsBtn:hover{color:var(--cyan);border-color:var(--cyan)}
+/* ---------- grid ---------- */
+#grid{flex:1 1 auto;display:grid;min-height:0;gap:8px;
+  grid-template-columns:1.05fr 1.15fr 1.05fr;
+  grid-template-rows:1.15fr 1fr;
+  grid-template-areas:"weather news hardware" "sea news space"}
+.panel{background:var(--panel);border:1px solid var(--line2);position:relative;
+  display:flex;flex-direction:column;min-height:0;overflow:hidden;
+  box-shadow:inset 0 0 30px #06101f}
+.panel .ph{flex:0 0 auto;display:flex;align-items:center;gap:8px;
+  padding:5px 10px;border-bottom:1px solid var(--line2);
+  font-size:10px;letter-spacing:2px;color:var(--cyan-dim)}
+.panel .ph::before{content:"";width:6px;height:6px;background:var(--cyan-dim);
+  box-shadow:0 0 6px var(--cyan-dim)}
+.panel .pb{flex:1 1 auto;min-height:0;overflow:hidden;padding:8px 10px}
+.panel.alerting{border-color:var(--red);animation:pborder 1.2s infinite}
+@keyframes pborder{0%,100%{box-shadow:inset 0 0 30px #06101f,0 0 0px #ff4d5e00}
+  50%{box-shadow:inset 0 0 30px #1f0608,0 0 14px #ff4d5e88}}
+@keyframes blink{50%{opacity:.3}}
+.err{color:var(--red);font-size:11px;padding:4px 0}
+.dimtxt{color:var(--dim)}
+/* ---------- weather ---------- */
+#pWeather{grid-area:weather}
+#wxNow{display:flex;gap:14px;align-items:center}
+#wxTemp{font-size:44px;color:#eaf6ff;text-shadow:0 0 12px #4fd8eb33}
+#wxDesc{font-size:13px;color:var(--cyan)}
+#wxStats{display:grid;grid-template-columns:1fr 1fr;gap:2px 14px;font-size:11px;margin-left:auto}
+#wxStats b{color:var(--amber);font-weight:normal}
+#wxDaily{display:flex;gap:4px;margin-top:8px}
+.wxDay{flex:1;text-align:center;border:1px solid var(--line2);padding:4px 2px;font-size:10px}
+.wxDay .nm{color:var(--dim)}
+.wxDay .ic{font-size:15px;line-height:1.5}
+.wxDay .hi{color:var(--amber)} .wxDay .lo{color:var(--cyan-dim)}
+#wxAlerts{margin-top:7px;font-size:11px}
+#wxAlerts .al{color:var(--red);padding:2px 0;border-top:1px dashed #3a1b22}
+/* ---------- sea ops ---------- */
+#pSea{grid-area:sea}
+#seaCols{display:flex;gap:12px;height:100%}
+#seaCols>div{flex:1;min-width:0}
+.subhead{font-size:9px;letter-spacing:2px;color:var(--dim);margin-bottom:5px}
+.tideRow{display:flex;justify-content:space-between;font-size:11px;padding:2px 0}
+.tideRow .hl{color:var(--cyan)} .tideRow .ll{color:var(--cyan-dim)}
+#hurrBox{font-size:11px}
+.storm{border:1px solid #4d1f26;padding:4px 6px;margin-bottom:4px}
+.storm .nm{color:var(--red);letter-spacing:1px}
+#noStorm{color:var(--green);font-size:11px;letter-spacing:1px}
+/* ---------- news ---------- */
+#pNews{grid-area:news}
+#newsTabs{display:flex;gap:2px;margin-left:auto}
+#newsTabs span{padding:2px 8px;font-size:9px;letter-spacing:1px;color:var(--dim);
+  border:1px solid transparent;cursor:pointer}
+#newsTabs span.on{color:var(--amber);border-color:var(--line)}
+.nItem{padding:5px 0;border-bottom:1px solid #0e1d30;font-size:12.5px;line-height:1.35}
+.nItem .src{color:var(--amber);font-size:9px;letter-spacing:1px;margin-right:6px}
+.nItem .tm{color:var(--dim);font-size:9px;float:right}
+/* ---------- hardware ---------- */
+#pHw{grid-area:hardware}
+.hwRow{display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:4px}
+.hwRow .lbl{flex:0 0 78px;color:var(--dim);letter-spacing:1px}
+.bar{flex:1;height:10px;background:#0b1626;border:1px solid var(--line2);position:relative}
+.bar i{position:absolute;inset:1px auto 1px 1px;background:linear-gradient(90deg,#1e6f84,var(--cyan));
+  transition:width .6s}
+.bar.warn i{background:linear-gradient(90deg,#8a5a1e,var(--amber))}
+.bar.crit i{background:linear-gradient(90deg,#7c1e2a,var(--red))}
+.hwRow .val{flex:0 0 92px;text-align:right;color:var(--text)}
+#coreGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:3px;margin:4px 0 8px}
+.core{height:26px;background:#0b1626;border:1px solid var(--line2);position:relative;overflow:hidden}
+.core i{position:absolute;left:0;right:0;bottom:0;background:var(--cyan-dim);transition:height .5s}
+.core span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:8px;color:#bfe9f2;z-index:1}
+#cpuChart,#netChart{width:100%;height:44px;display:block;margin-bottom:6px}
+#procList{font-size:10px;margin-top:5px}
+#procList div{display:flex;justify-content:space-between;padding:1px 0;color:var(--dim)}
+#procList div b{color:var(--text);font-weight:normal}
+#hwFoot{font-size:10px;color:var(--dim);margin-top:5px;display:flex;justify-content:space-between}
+/* ---------- space ---------- */
+#pSpace{grid-area:space}
+#spaceTabs{display:flex;gap:2px;margin-left:auto}
+#spaceTabs span{padding:2px 7px;font-size:9px;color:var(--dim);border:1px solid transparent;cursor:pointer;letter-spacing:1px}
+#spaceTabs span.on{color:var(--amber);border-color:var(--line)}
+.spView{display:none;height:100%}
+.spView.on{display:block}
+#issMap{width:100%;height:calc(100% - 22px);display:block}
+#issInfo{font-size:10px;color:var(--dim);display:flex;gap:14px;justify-content:center}
+#issInfo b{color:var(--cyan);font-weight:normal}
+.launch{padding:5px 0;border-bottom:1px solid #0e1d30;font-size:11.5px}
+.launch .cd{color:var(--amber);float:right}
+.launch .meta{color:var(--dim);font-size:10px}
+#kpBars{display:flex;align-items:flex-end;gap:2px;height:70px;margin:6px 0}
+#kpBars i{flex:1;background:var(--cyan-dim);min-height:2px}
+#kpBars i.warn{background:var(--amber)} #kpBars i.crit{background:var(--red)}
+#swxInfo{font-size:11px}
+#swxInfo .al{color:var(--dim);font-size:10px;padding:2px 0;border-top:1px dashed var(--line2)}
+#apodView img{width:100%;height:calc(100% - 34px);object-fit:cover;border:1px solid var(--line2)}
+#apodTitle{font-size:11px;color:var(--cyan);padding-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* ---------- ticker ---------- */
+#ticker{flex:0 0 30px;display:flex;align-items:center;margin:8px -10px 0;
+  border-top:1px solid var(--line);background:#060c16;overflow:hidden}
+#ticker .cap{flex:0 0 auto;padding:0 12px;color:var(--red);font-size:10px;letter-spacing:2px;
+  border-right:1px solid var(--line)}
+#tickerWrap{flex:1;overflow:hidden;position:relative;height:100%}
+#tickerTxt{position:absolute;white-space:nowrap;line-height:30px;font-size:12px;will-change:transform}
+#tickerTxt .src{color:var(--amber);font-size:9px;letter-spacing:1px}
+#tickerTxt .sep{color:var(--cyan-dim);margin:0 14px}
+.signalLost{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:#04070fd0;color:var(--red);letter-spacing:3px;font-size:11px;z-index:5}
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div id="shell">
+  <div id="hdr">
+    <div class="brand">MISSION CONTROL<small id="brandSub">TARPON SPRINGS STATION // 34689</small></div>
+    <div id="clockLocal"><div class="t" id="tLocal">--:--:--</div><div class="d" id="dLocal">---</div></div>
+    <div id="clockUTC">UTC<div class="t" id="tUTC">--:--</div></div>
+    <div id="statusLight" title="all systems nominal"></div>
+    <button id="fsBtn" title="fullscreen (or F11)">⛶</button>
+  </div>
+
+  <div id="grid">
+    <div class="panel" id="pWeather">
+      <div class="ph">ATMOSPHERICS — LOCAL CONDITIONS</div>
+      <div class="pb">
+        <div id="wxNow">
+          <div id="wxTemp">--°</div>
+          <div><div id="wxDesc">AWAITING DATA</div><div class="dimtxt" id="wxFeels"></div></div>
+          <div id="wxStats"></div>
+        </div>
+        <div id="wxDaily"></div>
+        <div id="wxAlerts"></div>
+      </div>
+    </div>
+
+    <div class="panel" id="pNews">
+      <div class="ph">COMMS — NEWSFEED<div id="newsTabs">
+        <span data-cat="local" class="on">LOCAL</span><span data-cat="us">US</span>
+        <span data-cat="world">WORLD</span><span data-cat="tech">TECH</span>
+      </div></div>
+      <div class="pb" id="newsBody"><div class="dimtxt">ACQUIRING SIGNAL…</div></div>
+    </div>
+
+    <div class="panel" id="pHw">
+      <div class="ph">SHIP SYSTEMS — TELEMETRY</div>
+      <div class="pb" id="hwBody">
+        <canvas id="cpuChart"></canvas>
+        <div class="hwRow"><span class="lbl">CPU</span><div class="bar" id="cpuBar"><i></i></div><span class="val" id="cpuVal">--%</span></div>
+        <div id="coreGrid"></div>
+        <div class="hwRow"><span class="lbl">LIFE SUPPORT<br>(RAM)</span><div class="bar" id="ramBar"><i></i></div><span class="val" id="ramVal">--</span></div>
+        <div id="diskRows"></div>
+        <canvas id="netChart"></canvas>
+        <div class="hwRow"><span class="lbl">UPLINK</span><span class="val" style="flex:1;text-align:left" id="netUp">--</span>
+          <span class="lbl">DOWNLINK</span><span class="val" style="text-align:left" id="netDown">--</span></div>
+        <div id="procList"></div>
+        <div id="hwFoot"><span id="hwUptime"></span><span id="hwMisc"></span></div>
+      </div>
+    </div>
+
+    <div class="panel" id="pSea">
+      <div class="ph">GULF OPS — TIDES &amp; TROPICS</div>
+      <div class="pb"><div id="seaCols">
+        <div><div class="subhead">TIDES — CLEARWATER STN</div><div id="tideBox" class="dimtxt">--</div>
+          <div class="subhead" style="margin-top:8px">WATER TEMP</div><div id="waterTemp" class="dimtxt">--</div></div>
+        <div><div class="subhead">TROPICAL ACTIVITY (NHC)</div><div id="hurrBox" class="dimtxt">--</div></div>
+      </div></div>
+    </div>
+
+    <div class="panel" id="pSpace">
+      <div class="ph">ORBITAL OPS<div id="spaceTabs">
+        <span data-v="iss" class="on">ISS</span><span data-v="launch">LAUNCHES</span>
+        <span data-v="swx">SPACE WX</span><span data-v="apod">APOD</span>
+      </div></div>
+      <div class="pb">
+        <div class="spView on" data-v="iss"><canvas id="issMap"></canvas>
+          <div id="issInfo"><span>LAT <b id="issLat">--</b></span><span>LON <b id="issLon">--</b></span>
+            <span>ALT <b id="issAlt">--</b></span><span>VEL <b id="issVel">--</b></span></div></div>
+        <div class="spView" data-v="launch" id="launchList"><div class="dimtxt">--</div></div>
+        <div class="spView" data-v="swx"><div id="swxInfo">PLANETARY K-INDEX (72H) <b id="kpNow" style="color:var(--cyan)"></b></div>
+          <div id="kpBars"></div><div id="swxAlerts"></div></div>
+        <div class="spView" data-v="apod" id="apodView"><div class="dimtxt">--</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="ticker"><div class="cap">LIVE FEED</div><div id="tickerWrap"><div id="tickerTxt">Initializing news uplink…</div></div></div>
+</div>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+/* Guard: this page must be served by server.py, not opened as a file */
+if(location.protocol==="file:"){
+  document.body.innerHTML=
+    '<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:Consolas,monospace;color:#ff4d5e;letter-spacing:2px;text-align:center">'+
+    '<div style="font-size:22px">⚠ WRONG LAUNCH SEQUENCE</div>'+
+    '<div style="color:#c8dbe8;font-size:13px;line-height:1.8;letter-spacing:1px">This file was opened directly, so it can\'t reach the data server.<br>'+
+    'Close this tab and double-click <b style="color:#ffb347">start_dashboard.bat</b> in the mission-control folder.<br>'+
+    'The address bar should then show <b style="color:#4fd8eb">localhost:8350</b>.</div></div>';
+  throw new Error("opened as file:// - server required");
+}
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+async function api(path){
+  const r=await fetch(path,{cache:"no-store"});
+  if(!r.ok)throw new Error("HTTP "+r.status);
+  const j=await r.json();
+  if(j&&j.error)throw new Error(j.error);
+  return j;
+}
+const alerts={};   // panelId -> bool
+function setAlert(panel,on){alerts[panel]=on;
+  document.getElementById(panel)?.classList.toggle("alerting",!!on);
+  $("#statusLight").classList.toggle("red",Object.values(alerts).some(Boolean));
+}
+function lost(panelSel,on,msg){
+  const p=$(panelSel);if(!p)return;
+  let el=p.querySelector(".signalLost");
+  if(on){if(!el){el=document.createElement("div");el.className="signalLost";p.appendChild(el);}
+    el.textContent=msg||"SIGNAL LOST";}
+  else el&&el.remove();
+}
+
+/* ---------- starfield ---------- */
+(function(){
+  const cv=$("#stars"),cx=cv.getContext("2d");let stars=[];
+  function size(){cv.width=innerWidth;cv.height=innerHeight;
+    stars=Array.from({length:170},()=>({x:Math.random()*cv.width,y:Math.random()*cv.height,
+      r:Math.random()*1.3+.2,p:Math.random()*Math.PI*2,s:.004+Math.random()*.01}));}
+  size();addEventListener("resize",size);
+  (function tick(){
+    cx.clearRect(0,0,cv.width,cv.height);
+    for(const st of stars){st.p+=st.s;st.x+=.02;if(st.x>cv.width)st.x=0;
+      cx.globalAlpha=.25+.75*Math.abs(Math.sin(st.p));
+      cx.fillStyle="#9fd8e8";cx.fillRect(st.x,st.y,st.r,st.r);}
+    cx.globalAlpha=1;requestAnimationFrame(tick);
+  })();
+})();
+
+/* ---------- clocks ---------- */
+const DAYS=["SUN","MON","TUE","WED","THU","FRI","SAT"],
+      MONS=["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+function pad(n){return String(n).padStart(2,"0")}
+setInterval(()=>{const n=new Date();
+  $("#tLocal").textContent=`${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
+  $("#dLocal").textContent=`${DAYS[n.getDay()]} ${pad(n.getDate())} ${MONS[n.getMonth()]} ${n.getFullYear()}`;
+  $("#tUTC").textContent=`${pad(n.getUTCHours())}:${pad(n.getUTCMinutes())}`;
+},1000);
+
+/* ---------- weather ---------- */
+const WMO={0:["CLEAR","☀"],1:["MOSTLY CLEAR","🌤"],2:["PARTLY CLOUDY","⛅"],3:["OVERCAST","☁"],
+  45:["FOG","🌫"],48:["FREEZING FOG","🌫"],51:["LIGHT DRIZZLE","🌦"],53:["DRIZZLE","🌦"],55:["HEAVY DRIZZLE","🌧"],
+  61:["LIGHT RAIN","🌧"],63:["RAIN","🌧"],65:["HEAVY RAIN","🌧"],66:["FREEZING RAIN","🌧"],67:["FREEZING RAIN","🌧"],
+  71:["LIGHT SNOW","🌨"],73:["SNOW","🌨"],75:["HEAVY SNOW","❄"],77:["SNOW GRAINS","❄"],
+  80:["SHOWERS","🌦"],81:["SHOWERS","🌧"],82:["VIOLENT SHOWERS","⛈"],
+  95:["THUNDERSTORM","⛈"],96:["T-STORM + HAIL","⛈"],99:["T-STORM + HAIL","⛈"]};
+function wmo(c){return WMO[c]||["CODE "+c,"·"]}
+async function loadWeather(){
+  try{
+    const w=await api("/api/weather");lost("#pWeather",false);
+    const c=w.current||{};
+    $("#wxTemp").textContent=Math.round(c.temperature_2m)+"°F";
+    $("#wxDesc").textContent=wmo(c.weather_code)[1]+" "+wmo(c.weather_code)[0];
+    $("#wxFeels").textContent="FEELS "+Math.round(c.apparent_temperature)+"°";
+    $("#wxStats").innerHTML=
+      `<span>HUM <b>${c.relative_humidity_2m}%</b></span><span>WIND <b>${Math.round(c.wind_speed_10m)} MPH</b></span>`+
+      `<span>GUST <b>${Math.round(c.wind_gusts_10m)}</b></span><span>UV <b>${c.uv_index??"--"}</b></span>`+
+      `<span>PRES <b>${Math.round(c.pressure_msl)}</b></span><span>CLOUD <b>${c.cloud_cover}%</b></span>`;
+    const d=w.daily||{},days=[];
+    for(let i=0;i<(d.time||[]).length&&i<7;i++){
+      const dt=new Date(d.time[i]+"T12:00:00");
+      days.push(`<div class="wxDay"><div class="nm">${i===0?"TODAY":DAYS[dt.getDay()]}</div>`+
+        `<div class="ic">${wmo(d.weather_code[i])[1]}</div>`+
+        `<div><span class="hi">${Math.round(d.temperature_2m_max[i])}</span> <span class="lo">${Math.round(d.temperature_2m_min[i])}</span></div>`+
+        `<div class="dimtxt">${d.precipitation_probability_max?.[i]??0}%</div></div>`);
+    }
+    $("#wxDaily").innerHTML=days.join("");
+    const al=w.nws_alerts||[];
+    $("#wxAlerts").innerHTML=al.slice(0,3).map(a=>`<div class="al">⚠ ${esc(a.event)} — ${esc(a.headline||"")}</div>`).join("");
+    setAlert("pWeather",al.length>0);
+  }catch(e){lost("#pWeather",true,"ATMOSPHERICS OFFLINE");}
+}
+
+/* ---------- sea ops ---------- */
+async function loadTides(){
+  try{
+    const t=await api("/api/tides");
+    const now=Date.now();
+    const rows=(t.predictions||[]).filter(p=>new Date(p.t.replace(" ","T")).getTime()>now-3600e3).slice(0,5)
+      .map(p=>{const dt=new Date(p.t.replace(" ","T"));
+        return `<div class="tideRow"><span class="${p.type==="H"?"hl":"ll"}">${p.type==="H"?"▲ HIGH":"▼ LOW"}</span>`+
+          `<span>${DAYS[dt.getDay()]} ${pad(dt.getHours())}:${pad(dt.getMinutes())}</span><span>${(+p.v).toFixed(1)} FT</span></div>`;});
+    $("#tideBox").innerHTML=rows.join("")||"NO DATA";
+    $("#waterTemp").textContent=t.water_temp?(+t.water_temp).toFixed(1)+" °F":"N/A";
+  }catch(e){$("#tideBox").innerHTML='<div class="err">TIDE DATA OFFLINE</div>';}
+}
+async function loadHurr(){
+  try{
+    const h=await api("/api/hurricanes");
+    const s=h.storms||[];
+    $("#hurrBox").innerHTML=s.length?s.map(x=>
+      `<div class="storm"><div class="nm">${esc(x.classification||"")} ${esc(x.name)}</div>`+
+      `<div class="dimtxt">${x.intensity?x.intensity+" KT · ":""}${x.pressure?x.pressure+" MB · ":""}${esc(x.movement||"")}</div></div>`).join("")
+      :'<div id="noStorm">■ ATLANTIC BASIN QUIET — NO ACTIVE SYSTEMS</div>';
+    setAlert("pSea",s.length>0);
+  }catch(e){$("#hurrBox").innerHTML='<div class="err">NHC LINK OFFLINE</div>';}
+}
+
+/* ---------- news + ticker ---------- */
+let newsData=null,newsCat="local",newsRotate=true;
+function renderNews(){
+  if(!newsData)return;
+  const d=newsData[newsCat]||{items:[]};
+  $("#newsBody").innerHTML=d.items.slice(0,14).map(it=>{
+    let tm="";const p=Date.parse(it.pub);
+    if(!isNaN(p)){const m=Math.round((Date.now()-p)/60000);
+      tm=m<60?m+"M":m<1440?Math.round(m/60)+"H":Math.round(m/1440)+"D";}
+    return `<div class="nItem"><span class="tm">${tm}</span><span class="src">${esc(it.source)}</span>${esc(it.title)}</div>`;
+  }).join("")||'<div class="err">NO ITEMS</div>';
+  document.querySelectorAll("#newsTabs span").forEach(s=>s.classList.toggle("on",s.dataset.cat===newsCat));
+}
+document.querySelectorAll("#newsTabs span").forEach(s=>s.addEventListener("click",()=>{
+  newsCat=s.dataset.cat;newsRotate=false;renderNews();}));
+setInterval(()=>{if(!newsRotate||!newsData)return;
+  const cats=["local","us","world","tech"];
+  newsCat=cats[(cats.indexOf(newsCat)+1)%cats.length];renderNews();},15000);
+
+let tickerAnim=null;
+function buildTicker(){
+  if(!newsData)return;
+  const parts=[];
+  for(const cat of["local","us","world","tech"])
+    for(const it of(newsData[cat]?.items||[]).slice(0,5))
+      parts.push(`<span class="src">${esc(it.source)}</span> ${esc(it.title)}`);
+  const el=$("#tickerTxt");
+  el.innerHTML=parts.join('<span class="sep">◆</span>')||"NO FEED";
+  if(tickerAnim)tickerAnim.cancel();
+  const w=el.scrollWidth,vw=$("#tickerWrap").clientWidth;
+  tickerAnim=el.animate([{transform:`translateX(${vw}px)`},{transform:`translateX(-${w}px)`}],
+    {duration:Math.max(30,(w+vw)*9),iterations:Infinity});
+}
+async function loadNews(){
+  try{newsData=await api("/api/news");lost("#pNews",false);renderNews();buildTicker();}
+  catch(e){lost("#pNews",true,"NEWSFEED OFFLINE");}
+}
+
+/* ---------- hardware ---------- */
+const cpuHist=[],netHist=[];
+function drawSpark(cv,data,max,color){
+  const c=cv.getContext("2d"),W=cv.width=cv.clientWidth,H=cv.height=cv.clientHeight;
+  c.clearRect(0,0,W,H);
+  c.strokeStyle="#12283f";c.beginPath();
+  for(let y=0;y<=H;y+=H/3){c.moveTo(0,y);c.lineTo(W,y);}c.stroke();
+  if(!data.length)return;
+  c.strokeStyle=color;c.lineWidth=1.4;c.beginPath();
+  data.forEach((v,i)=>{const x=i/(Math.max(data.length-1,1))*W,y=H-(Math.min(v,max)/max)*(H-2)-1;
+    i?c.lineTo(x,y):c.moveTo(x,y);});
+  c.stroke();
+  c.globalAlpha=.12;c.lineTo(W,H);c.lineTo(0,H);c.closePath();c.fillStyle=color;c.fill();c.globalAlpha=1;
+}
+function fmtB(b){return b>1048576?(b/1048576).toFixed(1)+" MB/s":b>1024?(b/1024).toFixed(0)+" KB/s":b+" B/s"}
+function fmtUp(s){const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);
+  return (d?d+"D ":"")+h+"H "+m+"M"}
+function barState(el,pct){el.classList.toggle("warn",pct>=70&&pct<90);el.classList.toggle("crit",pct>=90);
+  el.querySelector("i").style.width=pct+"%";}
+async function loadHw(){
+  try{
+    const h=await api("/api/hardware");lost("#pHw",false);
+    cpuHist.push(h.cpu_total);if(cpuHist.length>90)cpuHist.shift();
+    drawSpark($("#cpuChart"),cpuHist,100,"#4fd8eb");
+    barState($("#cpuBar"),h.cpu_total);
+    $("#cpuVal").textContent=h.cpu_total.toFixed(0)+"%"+(h.cpu_freq_mhz?" @"+(h.cpu_freq_mhz/1000).toFixed(1)+"GHz":"");
+    const cg=$("#coreGrid");
+    if(cg.children.length!==h.cpu_per_core.length)
+      cg.innerHTML=h.cpu_per_core.map((_,i)=>`<div class="core"><span>${i}</span><i></i></div>`).join("");
+    h.cpu_per_core.forEach((v,i)=>{const el=cg.children[i].querySelector("i");
+      el.style.height=v+"%";el.style.background=v>90?"var(--red)":v>70?"var(--amber)":"var(--cyan-dim)";});
+    barState($("#ramBar"),h.ram_pct);
+    $("#ramVal").textContent=`${h.ram_used_gb}/${h.ram_total_gb}GB`;
+    $("#diskRows").innerHTML=(h.disks||[]).slice(0,3).map((d,i)=>
+      `<div class="hwRow"><span class="lbl">CARGO ${esc(d.mount)}</span>`+
+      `<div class="bar ${d.pct>=90?"crit":d.pct>=75?"warn":""}"><i style="width:${d.pct}%"></i></div>`+
+      `<span class="val">${d.used_gb}/${d.total_gb}G</span></div>`).join("");
+    netHist.push(h.net_down_bps);if(netHist.length>90)netHist.shift();
+    drawSpark($("#netChart"),netHist,Math.max(...netHist,1024),"#5dd97c");
+    $("#netUp").textContent="▲ "+fmtB(h.net_up_bps);
+    $("#netDown").textContent="▼ "+fmtB(h.net_down_bps);
+    $("#procList").innerHTML=(h.top_procs||[]).map(p=>
+      `<div><b>${esc(p.name)}</b><span>CPU ${p.cpu}% · MEM ${p.mem}%</span></div>`).join("");
+    const t=Object.entries(h.temps||{}).slice(0,2).map(([k,v])=>`${esc(k)} ${v}°C`).join(" · ");
+    $("#hwUptime").textContent="UPTIME "+fmtUp(h.uptime_s);
+    $("#hwMisc").textContent=(t?t+" · ":"")+h.proc_count+" PROCS";
+    setAlert("pHw",h.cpu_total>90||h.ram_pct>92);
+  }catch(e){lost("#pHw",true,"TELEMETRY OFFLINE");}
+}
+
+/* ---------- space: tabs ---------- */
+let spaceView="iss",spaceRotate=true;
+function showSpace(v){spaceView=v;
+  document.querySelectorAll("#spaceTabs span").forEach(s=>s.classList.toggle("on",s.dataset.v===v));
+  document.querySelectorAll(".spView").forEach(s=>s.classList.toggle("on",s.dataset.v===v));
+  if(v==="iss")drawIss();
+}
+document.querySelectorAll("#spaceTabs span").forEach(s=>s.addEventListener("click",()=>{
+  spaceRotate=false;showSpace(s.dataset.v);}));
+setInterval(()=>{if(!spaceRotate)return;
+  const vs=["iss","launch","swx","apod"];
+  showSpace(vs[(vs.indexOf(spaceView)+1)%vs.length]);},20000);
+
+/* ---------- ISS ---------- */
+const issTrail=[];let issNow=null;
+const HOME={lat:28.146,lon:-82.757};
+function drawIss(){
+  const cv=$("#issMap");if(!cv.clientWidth)return;
+  const c=cv.getContext("2d"),W=cv.width=cv.clientWidth,H=cv.height=cv.clientHeight;
+  c.clearRect(0,0,W,H);
+  c.strokeStyle="#122c44";c.lineWidth=1;
+  for(let lon=-180;lon<=180;lon+=30){const x=(lon+180)/360*W;
+    c.beginPath();c.moveTo(x,0);c.lineTo(x,H);c.stroke();}
+  for(let lat=-90;lat<=90;lat+=30){const y=(90-lat)/180*H;
+    c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke();}
+  c.strokeStyle="#1b3a5c";c.strokeRect(0,0,W,H);
+  const px=p=>[(p.lon+180)/360*W,(90-p.lat)/180*H];
+  // home marker
+  const[hx,hy]=px(HOME);
+  c.strokeStyle="#ffb347";c.beginPath();c.moveTo(hx-4,hy);c.lineTo(hx+4,hy);
+  c.moveTo(hx,hy-4);c.lineTo(hx,hy+4);c.stroke();
+  // trail
+  c.fillStyle="#2a7f94";
+  for(const p of issTrail){const[x,y]=px(p);c.globalAlpha=.5;c.fillRect(x-1,y-1,2,2);}
+  c.globalAlpha=1;
+  if(issNow){const[x,y]=px(issNow);
+    c.fillStyle="#4fd8eb";c.beginPath();c.arc(x,y,4,0,7);c.fill();
+    c.strokeStyle="#4fd8eb";c.globalAlpha=.5;c.beginPath();c.arc(x,y,8+(Date.now()/100%10),0,7);c.stroke();c.globalAlpha=1;
+    c.fillStyle="#9fe6f2";c.font="9px monospace";c.fillText("ISS",x+10,y+3);}
+}
+async function loadIss(){
+  try{
+    const d=await api("/api/iss");
+    issNow={lat:d.lat,lon:d.lon};
+    issTrail.push(issNow);if(issTrail.length>120)issTrail.shift();
+    $("#issLat").textContent=d.lat.toFixed(2)+"°";
+    $("#issLon").textContent=d.lon.toFixed(2)+"°";
+    $("#issAlt").textContent=d.alt_km?d.alt_km.toFixed(0)+" KM":"--";
+    $("#issVel").textContent=d.vel_kmh?(d.vel_kmh).toFixed(0)+" KM/H":"--";
+    if(spaceView==="iss")drawIss();
+  }catch(e){}
+}
+
+/* ---------- launches ---------- */
+let launches=[],launchesLoaded=false;
+function renderLaunches(){
+  const now=Date.now();
+  $("#launchList").innerHTML=launches.map(l=>{
+    const t=Date.parse(l.net),d=t-now;
+    let cd="--";
+    if(!isNaN(t)){const s=Math.abs(d)/1000;
+      cd=(d<0?"T+":"T-")+Math.floor(s/86400)+"D "+pad(Math.floor(s%86400/3600))+":"+pad(Math.floor(s%3600/60))+":"+pad(Math.floor(s%60));}
+    return `<div class="launch"><span class="cd">${cd}</span>${esc(l.name)}`+
+      `<div class="meta">${esc(l.provider||"")} · ${esc(l.pad||"")}${l.probability?" · GO "+l.probability+"%":""}</div></div>`;
+  }).join("")||'<div class="dimtxt">NO UPCOMING LAUNCHES</div>';
+  const soon=launches.some(l=>{const d=Date.parse(l.net)-now;return d>0&&d<600e3;});
+  setAlert("pSpace",soon);
+}
+async function loadLaunches(){
+  try{const d=await api("/api/launches");launches=d.launches||[];launchesLoaded=true;renderLaunches();}
+  catch(e){launchesLoaded=false;$("#launchList").innerHTML='<div class="err">LAUNCH DATA OFFLINE</div>';}
+}
+setInterval(()=>{if(spaceView==="launch"&&launchesLoaded)renderLaunches();},1000);
+
+/* ---------- space weather ---------- */
+async function loadSwx(){
+  try{
+    const d=await api("/api/spacewx");
+    const kp=d.kp||[];
+    const last=kp.length?kp[kp.length-1].kp:0;
+    $("#kpNow").textContent="NOW "+last.toFixed(1)+(d.solar_wind?" · SOLAR WIND "+d.solar_wind+" KM/S":"");
+    $("#kpBars").innerHTML=kp.map(r=>{
+      const h=Math.max(2,r.kp/9*100);
+      return `<i class="${r.kp>=5?"crit":r.kp>=4?"warn":""}" style="height:${h}%" title="${r.t} Kp${r.kp}"></i>`;}).join("");
+    $("#swxAlerts").innerHTML=(d.alerts||[]).slice(0,2).map(a=>`<div class="al">${esc(a.msg)}</div>`).join("");
+    if(last>=5)setAlert("pSpace",true);
+  }catch(e){$("#kpNow").textContent="OFFLINE";}
+}
+
+/* ---------- APOD ---------- */
+async function loadApod(){
+  try{
+    const d=await api("/api/apod");
+    $("#apodView").innerHTML=`<img src="${esc(d.url)}" alt=""><div id="apodTitle">NASA APOD · ${esc(d.date||"")} — ${esc(d.title||"")}</div>`;
+  }catch(e){$("#apodView").innerHTML='<div class="err">APOD OFFLINE (rate limit? add free NASA key in server.py)</div>';}
+}
+
+/* ---------- burn-in shift + night dim + cursor hide ---------- */
+setInterval(()=>{const x=Math.round(Math.random()*8-4),y=Math.round(Math.random()*6-3);
+  $("#shell").style.transform=`translate(${x}px,${y}px)`;},240000);
+function nightCheck(){const h=new Date().getHours();
+  document.body.classList.toggle("night",h>=23||h<7);}
+nightCheck();setInterval(nightCheck,60000);
+let cursorTimer=null;
+addEventListener("mousemove",()=>{document.body.classList.remove("hidecursor");
+  clearTimeout(cursorTimer);cursorTimer=setTimeout(()=>document.body.classList.add("hidecursor"),8000);});
+$("#fsBtn").addEventListener("click",()=>{
+  document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();});
+
+/* ---------- schedulers ---------- */
+loadHw();setInterval(loadHw,2000);
+loadIss();setInterval(loadIss,5000);
+loadNews();setInterval(loadNews,10*60e3);
+loadWeather();setInterval(loadWeather,10*60e3);
+loadTides();setInterval(loadTides,60*60e3);
+loadHurr();setInterval(loadHurr,30*60e3);
+loadLaunches();setInterval(loadLaunches,60*60e3);
+loadSwx();setInterval(loadSwx,15*60e3);
+loadApod();setInterval(loadApod,6*60*60e3);
+addEventListener("resize",()=>{if(spaceView==="iss")drawIss();buildTicker();});
+</script>
+</body>
+</html>
