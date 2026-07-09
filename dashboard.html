@@ -78,15 +78,21 @@ body.hidecursor{cursor:none}
 .storm{border:1px solid #4d1f26;padding:4px 6px;margin-bottom:4px}
 .storm .nm{color:var(--red);letter-spacing:1px}
 #noStorm{color:var(--green);font-size:11px;letter-spacing:1px}
-/* ---------- news ---------- */
+/* ---------- video uplink ---------- */
 #pNews{grid-area:news}
-#newsTabs{display:flex;gap:2px;margin-left:auto}
-#newsTabs span{padding:2px 8px;font-size:9px;letter-spacing:1px;color:var(--dim);
-  border:1px solid transparent;cursor:pointer}
-#newsTabs span.on{color:var(--amber);border-color:var(--line)}
-.nItem{padding:5px 0;border-bottom:1px solid #0e1d30;font-size:12.5px;line-height:1.35}
-.nItem .src{color:var(--amber);font-size:9px;letter-spacing:1px;margin-right:6px}
-.nItem .tm{color:var(--dim);font-size:9px;float:right}
+#pNews .pb{display:flex;flex-direction:column;gap:8px}
+#ytWrap{position:relative;width:100%;aspect-ratio:16/9;background:#000;
+  border:1px solid var(--line2);flex:0 0 auto}
+#ytWrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+#vidList{flex:1 1 auto;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
+.vid{display:flex;gap:8px;padding:4px 2px;border-bottom:1px solid #0e1d30;cursor:pointer;align-items:center}
+.vid:hover{background:#0e1d30}
+.vid.playing{background:#12283f;border-left:2px solid var(--cyan)}
+.vid img{width:74px;height:42px;object-fit:cover;border:1px solid var(--line2);flex:0 0 auto}
+.vid .vt{font-size:11.5px;line-height:1.3;overflow:hidden;display:-webkit-box;
+  -webkit-line-clamp:2;-webkit-box-orient:vertical}
+.vid .vm{color:var(--dim);font-size:9px;letter-spacing:1px;margin-top:2px}
+.vid .vm b{color:var(--amber);font-weight:normal}
 /* ---------- hardware ---------- */
 #pHw{grid-area:hardware}
 .hwRow{display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:4px}
@@ -166,11 +172,12 @@ body.hidecursor{cursor:none}
     </div>
 
     <div class="panel" id="pNews">
-      <div class="ph">COMMS — NEWSFEED<div id="newsTabs">
-        <span data-cat="local" class="on">LOCAL</span><span data-cat="us">US</span>
-        <span data-cat="world">WORLD</span><span data-cat="tech">TECH</span>
-      </div></div>
-      <div class="pb" id="newsBody"><div class="dimtxt">ACQUIRING SIGNAL…</div></div>
+      <div class="ph">VIDEO UPLINK — LATEST TRANSMISSIONS</div>
+      <div class="pb">
+        <div id="ytWrap"><iframe id="ytPlayer" src="about:blank" title="video player"
+          allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>
+        <div id="vidList"><div class="dimtxt">ACQUIRING VIDEO SIGNAL…</div></div>
+      </div>
     </div>
 
     <div class="panel" id="pHw">
@@ -337,24 +344,32 @@ async function loadHurr(){
   }catch(e){$("#hurrBox").innerHTML='<div class="err">NHC LINK OFFLINE</div>';}
 }
 
-/* ---------- news + ticker ---------- */
-let newsData=null,newsCat="local",newsRotate=true;
-function renderNews(){
-  if(!newsData)return;
-  const d=newsData[newsCat]||{items:[]};
-  $("#newsBody").innerHTML=d.items.slice(0,14).map(it=>{
-    let tm="";const p=Date.parse(it.pub);
-    if(!isNaN(p)){const m=Math.round((Date.now()-p)/60000);
-      tm=m<60?m+"M":m<1440?Math.round(m/60)+"H":Math.round(m/1440)+"D";}
-    return `<div class="nItem"><span class="tm">${tm}</span><span class="src">${esc(it.source)}</span>${esc(it.title)}</div>`;
-  }).join("")||'<div class="err">NO ITEMS</div>';
-  document.querySelectorAll("#newsTabs span").forEach(s=>s.classList.toggle("on",s.dataset.cat===newsCat));
+/* ---------- news ticker + video uplink ---------- */
+let newsData=null;
+function ago(iso){const p=Date.parse(iso);if(isNaN(p))return"";
+  const m=Math.round((Date.now()-p)/60000);
+  return m<60?m+"M":m<1440?Math.round(m/60)+"H":Math.round(m/1440)+"D";}
+let vids=[],playingId=null;
+function playVid(id,mute){playingId=id;
+  $("#ytPlayer").src=`https://www.youtube.com/embed/${id}?autoplay=1&mute=${mute?1:0}&rel=0`;
+  document.querySelectorAll(".vid").forEach(v=>v.classList.toggle("playing",v.dataset.id===id));}
+function renderVids(){
+  $("#vidList").innerHTML=vids.map(v=>
+    `<div class="vid ${v.id===playingId?"playing":""}" data-id="${esc(v.id)}">`+
+    `<img src="${esc(v.thumb)}" loading="lazy" alt="">`+
+    `<div><div class="vt">${esc(v.title)}</div>`+
+    `<div class="vm"><b>${esc(v.channel)}</b> · ${ago(v.published)} AGO</div></div></div>`).join("")
+    ||'<div class="err">NO VIDEOS</div>';
+  document.querySelectorAll(".vid").forEach(v=>
+    v.addEventListener("click",()=>playVid(v.dataset.id,false)));
 }
-document.querySelectorAll("#newsTabs span").forEach(s=>s.addEventListener("click",()=>{
-  newsCat=s.dataset.cat;newsRotate=false;renderNews();}));
-setInterval(()=>{if(!newsRotate||!newsData)return;
-  const cats=["local","us","world","tech"];
-  newsCat=cats[(cats.indexOf(newsCat)+1)%cats.length];renderNews();},15000);
+async function loadVids(){
+  try{
+    const d=await api("/api/videos");vids=d.videos||[];
+    lost("#pNews",false);renderVids();
+    if(!playingId&&vids.length)playVid(vids[0].id,true); // newest upload, muted
+  }catch(e){lost("#pNews",true,"VIDEO UPLINK OFFLINE");}
+}
 
 let tickerAnim=null;
 function buildTicker(){
@@ -371,8 +386,8 @@ function buildTicker(){
     {duration:Math.max(30,(w+vw)*9),iterations:Infinity});
 }
 async function loadNews(){
-  try{newsData=await api("/api/news");lost("#pNews",false);renderNews();buildTicker();}
-  catch(e){lost("#pNews",true,"NEWSFEED OFFLINE");}
+  try{newsData=await api("/api/news");buildTicker();}
+  catch(e){/* ticker keeps last content */}
 }
 
 /* ---------- hardware ---------- */
@@ -538,6 +553,7 @@ $("#fsBtn").addEventListener("click",()=>{
 loadHw();setInterval(loadHw,2000);
 loadIss();setInterval(loadIss,5000);
 loadNews();setInterval(loadNews,10*60e3);
+loadVids();setInterval(loadVids,15*60e3);
 loadWeather();setInterval(loadWeather,10*60e3);
 loadTides();setInterval(loadTides,60*60e3);
 loadHurr();setInterval(loadHurr,30*60e3);
