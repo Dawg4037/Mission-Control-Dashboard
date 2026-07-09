@@ -54,6 +54,17 @@ FEEDS = {
     ],
 }
 
+# YouTube channels for the video panel (name, channel_id) - uploads pulled via RSS, no API key
+YT_CHANNELS = [
+    ("NASA", "UCLA_DiR1FfKNvjuUpBHmylQ"),
+    ("SpaceX", "UCtI0Hodo5o5dUb67FeUjDeA"),
+    ("NASASpaceflight", "UCSUu1lih2RifWkKtDOJdsBA"),
+    ("Linus Tech Tips", "UCXuqSBlHAE6Xw-yeJA0Tunw"),
+    ("Gamers Nexus", "UChIs72whgZI9w6d6FhwGGHA"),
+    ("ABC News", "UCBi2mrWuNuyYy4gbM6fU18Q"),
+    ("NBC News", "UCeY0bbntWzzVIaj2z3QigXg"),
+]
+
 HERE = Path(__file__).parent
 UA = {"User-Agent": "MissionControlDashboard/1.0 (personal use)"}
 
@@ -141,6 +152,34 @@ def get_news():
                     inter.append(by_src[src].pop(0))
         out[cat] = {"items": inter, "errors": errors}
     return out
+
+
+def get_videos():
+    """Latest uploads from YT_CHANNELS via YouTube's public RSS (Atom)."""
+    NS = {
+        "a": "http://www.w3.org/2005/Atom",
+        "yt": "http://www.youtube.com/xml/schemas/2015",
+    }
+    vids, errors = [], []
+    for name, cid in YT_CHANNELS:
+        try:
+            root = ET.fromstring(fetch_raw(
+                f"https://www.youtube.com/feeds/videos.xml?channel_id={cid}"))
+            for e in root.findall("a:entry", NS)[:4]:
+                vid = e.findtext("yt:videoId", "", NS)
+                if not vid:
+                    continue
+                vids.append({
+                    "id": vid,
+                    "title": e.findtext("a:title", "", NS),
+                    "channel": name,
+                    "published": e.findtext("a:published", "", NS),
+                    "thumb": f"https://i.ytimg.com/vi/{vid}/mqdefault.jpg",
+                })
+        except Exception as ex:
+            errors.append(f"{name}: {ex}")
+    vids.sort(key=lambda v: v["published"], reverse=True)
+    return {"videos": vids[:24], "errors": errors}
 
 
 # ------------------------- WEATHER / TIDES / HURRICANES -------------------------
@@ -361,6 +400,7 @@ ROUTES = {
     "/api/hardware": lambda: get_hardware(),                       # no cache
     "/api/iss":      lambda: cached("iss", 5, get_iss),
     "/api/news":     lambda: cached("news", 600, get_news),
+    "/api/videos":   lambda: cached("videos", 900, get_videos),
     "/api/weather":  lambda: cached("weather", 600, get_weather),
     "/api/tides":    lambda: cached("tides", 3600, get_tides),
     "/api/hurricanes": lambda: cached("hurr", 1800, get_hurricanes),
