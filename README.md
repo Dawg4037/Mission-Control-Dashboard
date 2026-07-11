@@ -15,6 +15,7 @@ To stop: close the minimized "Mission Control Server" window.
 | Panel | Data | Refresh |
 |---|---|---|
 | Atmospherics | Open-Meteo forecast + NWS alerts | 10 min |
+| Precip Scan | NWS doppler radar loop, Tampa Bay station KTBW (radar.weather.gov) | 5 min |
 | Comms / Newsfeed | Local (WFLA, FOX 13, ABC AN), US (NPR, CBS, Fox), World (BBC, NPR, Al Jazeera), Tech (Ars, Verge, HN) — tabs auto-rotate 15s; click a tab to pin | 10 min |
 | Ship Systems | Live CPU (per-core), RAM, disks, network, uptime, top processes via psutil | 2 s |
 | Gulf Ops | NOAA tides (Clearwater station) + NHC tropical activity | 1 h / 30 min |
