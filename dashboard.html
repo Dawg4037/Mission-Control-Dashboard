@@ -37,7 +37,8 @@ body.hidecursor{cursor:none}
 #grid{flex:1 1 auto;display:grid;min-height:0;gap:8px;
   grid-template-columns:1.05fr 1.15fr 1.05fr;
   grid-template-rows:1.15fr 1fr;
-  grid-template-areas:"weather news hardware" "sea news space"}
+  grid-template-areas:"left news hardware" "left news space"}
+#colLeft{grid-area:left;display:flex;flex-direction:column;gap:8px;min-height:0}
 .panel{background:var(--panel);border:1px solid var(--line2);position:relative;
   display:flex;flex-direction:column;min-height:0;overflow:hidden;
   box-shadow:inset 0 0 30px #06101f}
@@ -54,7 +55,7 @@ body.hidecursor{cursor:none}
 .err{color:var(--red);font-size:11px;padding:4px 0}
 .dimtxt{color:var(--dim)}
 /* ---------- weather ---------- */
-#pWeather{grid-area:weather}
+#pWeather{flex:0 0 auto}
 #wxNow{display:flex;gap:14px;align-items:center}
 #wxTemp{font-size:44px;color:#eaf6ff;text-shadow:0 0 12px #4fd8eb33}
 #wxDesc{font-size:13px;color:var(--cyan)}
@@ -67,8 +68,12 @@ body.hidecursor{cursor:none}
 .wxDay .hi{color:var(--amber)} .wxDay .lo{color:var(--cyan-dim)}
 #wxAlerts{margin-top:7px;font-size:11px}
 #wxAlerts .al{color:var(--red);padding:2px 0;border-top:1px dashed #3a1b22}
+/* ---------- radar ---------- */
+#pRadar{flex:1 1 auto;min-height:110px}
+#pRadar .pb{padding:4px;display:flex}
+#radarImg{width:100%;height:100%;min-height:0;object-fit:contain}
 /* ---------- sea ops ---------- */
-#pSea{grid-area:sea}
+#pSea{flex:0 0 auto}
 #seaCols{display:flex;gap:12px;height:100%}
 #seaCols>div{flex:1;min-width:0}
 .subhead{font-size:9px;letter-spacing:2px;color:var(--dim);margin-bottom:5px}
@@ -158,6 +163,7 @@ body.hidecursor{cursor:none}
   </div>
 
   <div id="grid">
+    <div id="colLeft">
     <div class="panel" id="pWeather">
       <div class="ph">ATMOSPHERICS — LOCAL CONDITIONS</div>
       <div class="pb">
@@ -169,6 +175,21 @@ body.hidecursor{cursor:none}
         <div id="wxDaily"></div>
         <div id="wxAlerts"></div>
       </div>
+    </div>
+
+    <div class="panel" id="pRadar">
+      <div class="ph">PRECIP SCAN — KTBW DOPPLER</div>
+      <div class="pb"><img id="radarImg" src="" alt="NWS radar loop"></div>
+    </div>
+
+    <div class="panel" id="pSea">
+      <div class="ph">GULF OPS — TIDES &amp; TROPICS</div>
+      <div class="pb"><div id="seaCols">
+        <div><div class="subhead">TIDES — CLEARWATER STN</div><div id="tideBox" class="dimtxt">--</div>
+          <div class="subhead" style="margin-top:8px">WATER TEMP</div><div id="waterTemp" class="dimtxt">--</div></div>
+        <div><div class="subhead">TROPICAL ACTIVITY (NHC)</div><div id="hurrBox" class="dimtxt">--</div></div>
+      </div></div>
+    </div>
     </div>
 
     <div class="panel" id="pNews">
@@ -194,15 +215,6 @@ body.hidecursor{cursor:none}
         <div id="procList"></div>
         <div id="hwFoot"><span id="hwUptime"></span><span id="hwMisc"></span></div>
       </div>
-    </div>
-
-    <div class="panel" id="pSea">
-      <div class="ph">GULF OPS — TIDES &amp; TROPICS</div>
-      <div class="pb"><div id="seaCols">
-        <div><div class="subhead">TIDES — CLEARWATER STN</div><div id="tideBox" class="dimtxt">--</div>
-          <div class="subhead" style="margin-top:8px">WATER TEMP</div><div id="waterTemp" class="dimtxt">--</div></div>
-        <div><div class="subhead">TROPICAL ACTIVITY (NHC)</div><div id="hurrBox" class="dimtxt">--</div></div>
-      </div></div>
     </div>
 
     <div class="panel" id="pSpace">
@@ -342,6 +354,15 @@ async function loadHurr(){
       :'<div id="noStorm">■ ATLANTIC BASIN QUIET — NO ACTIVE SYSTEMS</div>';
     setAlert("pSea",s.length>0);
   }catch(e){$("#hurrBox").innerHTML='<div class="err">NHC LINK OFFLINE</div>';}
+}
+
+/* ---------- radar ---------- */
+const RADAR_URL="https://radar.weather.gov/ridge/standard/KTBW_loop.gif";
+function loadRadar(){
+  const img=$("#radarImg");
+  img.onload=()=>lost("#pRadar",false);
+  img.onerror=()=>lost("#pRadar",true,"RADAR OFFLINE");
+  img.src=RADAR_URL+"?t="+Date.now();
 }
 
 /* ---------- news ticker + video uplink ---------- */
@@ -556,6 +577,7 @@ loadNews();setInterval(loadNews,10*60e3);
 loadVids();setInterval(loadVids,15*60e3);
 loadWeather();setInterval(loadWeather,10*60e3);
 loadTides();setInterval(loadTides,60*60e3);
+loadRadar();setInterval(loadRadar,5*60e3);
 loadHurr();setInterval(loadHurr,30*60e3);
 loadLaunches();setInterval(loadLaunches,60*60e3);
 loadSwx();setInterval(loadSwx,15*60e3);
